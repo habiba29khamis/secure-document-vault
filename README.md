@@ -1,3 +1,24 @@
+
+REQUIRMENTS ✨
+1. Node.js installed
+Add this at the top of Setup Instructions:
+
+bash
+# Prerequisites
+- Node.js (v18 or higher)
+- MySQL or MariaDB (XAMPP works)
+2. Google OAuth Setup (if they want Google Login)
+Add this section:
+
+markdown
+## 🔑 Google OAuth Setup (Optional)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project → APIs & Services → Credentials
+3. Create OAuth client ID (Web application)
+4. Set redirect URI: `http://localhost:3000/api/auth/google/callback`
+5. Copy Client ID and Secret to `.env` file
+
 # 🔐 Secure Document Vault
 
 > A secure web platform to upload, encrypt, sign, and verify documents with role-based access control.
@@ -83,7 +104,9 @@ UPDATE users SET role = 'admin' WHERE id = 1;
 🔒 HTTPS Mode
 To run with HTTPS:
 
-bash
 node server-https.js
 Then open: https://localhost:3443
+
+
+
 
