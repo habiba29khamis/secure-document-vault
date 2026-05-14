@@ -1,9 +1,4 @@
 
-REQUIRMENTS ✨
-1. Node.js installed
-Add this at the top of Setup Instructions:
-
-bash
 # Prerequisites
 - Node.js (v18 or higher)
 - MySQL or MariaDB (XAMPP works)
