@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Secure Document Vault</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background-image: url('/pics/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        header h2 {
+            color: #e8f5e9;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            background: #e94560;
+            color: white;
+        }
+        .nav-link, .logout {
+            background: rgba(46,125,50,0.8);
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            border: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .nav-link:hover, .logout:hover {
+            background: #1b5e20;
+            transform: translateY(-2px);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .glass-card {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+        .glass-card h3 {
+            color: #e8f5e9;
+            margin-bottom: 15px;
+            border-left: 4px solid #e94560;
+            padding-left: 15px;
+        }
+        .glass-card p {
+            color: #c8e6c9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            color: #e8f5e9;
+        }
+        th {
+            background: rgba(233,69,96,0.4);
+            color: white;
+            font-weight: bold;
+        }
+        select, button {
+            padding: 5px 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        select {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        select option {
+            background: #1a1a2e;
+            color: white;
+        }
+        button {
+            background: #e94560;
+            color: white;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #c72a4a;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>👑 Admin Panel</h2>
+        <div class="header-buttons">
+            <span class="badge">ADMIN</span>
+            <a href="/dashboard.html" class="nav-link">📊 Dashboard</a>
+            <button class="logout" onclick="logout()">🚪 Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="glass-card">
+            <h3>📊 System Overview</h3>
+            <p>Welcome, <span id="adminName">Admin</span>! You have full system access to manage users and documents.</p>
+        </div>
+
+        <div class="glass-card">
+            <h3>👥 Manage Users</h3>
+            <div style="overflow-x: auto;">
+                <table id="usersTable">
+                    <thead>
+                        <tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>2FA</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="usersBody">
+                        <tr><td colspan="6">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h3>📄 All Documents</h3>
+            <div style="overflow-x: auto;">
+                <table id="docsTable">
+                    <thead>
+                        <tr><th>ID</th><th>Filename</th><th>Owner</th><th>Size</th><th>Uploaded</th></tr>
+                    </thead>
+                    <tbody id="docsBody">
+                        <tr><td colspan="5">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        if (user.role !== 'admin') {
+            alert('Admin access required!');
+            window.location.href = '/dashboard.html';
+        }
+
+        document.getElementById('adminName').textContent = user.username;
+
+        async function loadUsers() {
+            const response = await fetch('/api/admin/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const users = await response.json();
+            
+            const tbody = document.getElementById('usersBody');
+            tbody.innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.id}</td>
+                    <td>${u.username}</td>
+                    <td>${u.email}</td>
+                    <td>
+                        <select onchange="updateRole(${u.id}, this.value)">
+                            <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                            <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Manager</option>
+                            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </td>
+                    <td>${u.two_factor_enabled ? '✅ Enabled' : '❌ Disabled'}</td>
+                    <td><button onclick="deleteUser(${u.id})">🗑️ Delete</button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function updateRole(userId, role) {
+            await fetch(`/api/admin/users/${userId}/role`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role })
+            });
+            loadUsers();
+        }
+
+        async function deleteUser(userId) {
+            if (confirm('Delete this user?')) {
+                await fetch(`/api/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                loadUsers();
+            }
+        }
+
+        async function loadDocuments() {
+            const response = await fetch('/api/admin/documents', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const docs = await response.json();
+            
+            const tbody = document.getElementById('docsBody');
+            tbody.innerHTML = docs.map(d => `
+                <tr>
+                    <td>${d.id}</td>
+                    <td>${d.original_name}</td>
+                    <td>${d.username}</td>
+                    <td>${(d.file_size / 1024).toFixed(2)} KB</td>
+                    <td>${new Date(d.uploaded_at).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        loadUsers();
+        loadDocuments();
+    </script>
+</body>
+</html>

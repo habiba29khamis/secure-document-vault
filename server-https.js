@@ -8,13 +8,16 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const passport = require('passport');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
+// Middleware (same as before)
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -32,26 +35,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/pics', express.static('pics'));
 
-// Session middleware (required for passport)
 app.use(session({
     secret: process.env.SESSION_SECRET || 'mysecret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: { secure: true } // true for HTTPS
 }));
 
-// Passport middleware
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100
-});
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
-// Database connection
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
@@ -68,7 +64,6 @@ db.connect((err) => {
     console.log('Connected to MySQL database');
 });
 
-// Make db available to routes
 app.use((req, res, next) => {
     req.db = db;
     next();
@@ -87,15 +82,26 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/auth', oauthRoutes);
 
 app.get('/api/protected', authenticateToken, (req, res) => {
-    res.json({ message: `Hello ${req.user.username}, you have access!`, user: req.user });
+    res.json({ message: `Hello ${req.user.username}`, user: req.user });
 });
 
-// Test route
 app.get('/', (req, res) => {
     res.send('Secure Document Vault API is running');
 });
 
-// Start server
+// Generate self-signed certificate for development
+const httpsOptions = {
+    key: fs.readFileSync(path.join(__dirname, 'key.pem')),
+    cert: fs.readFileSync(path.join(__dirname, 'cert.pem'))
+};
+
+// Create HTTPS server
+https.createServer(httpsOptions, app).listen(3443, () => {
+    console.log('HTTPS Server running on https://localhost:3443');
+    console.log('HTTP Server running on http://localhost:3000');
+});
+
+// Also keep HTTP for testing
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`HTTP Server running on port ${port}`);
 });

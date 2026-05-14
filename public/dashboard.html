@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Secure Document Vault</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background-image: url('/pics/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: rgba(0, 30, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        header h2 {
+            color: #e8f5e9;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-admin { background: #e94560; color: white; }
+        .badge-manager { background: #ffa500; color: #1a1a2e; }
+        .badge-user { background: #2e7d32; color: white; }
+        .logout, .admin-link {
+            background: rgba(46,125,50,0.8);
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            border: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .logout:hover, .admin-link:hover {
+            background: #1b5e20;
+            transform: translateY(-2px);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .glass-card {
+            background: rgba(0, 30, 0, 0.35);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        .glass-card h3 {
+            color: #e8f5e9;
+            margin-bottom: 15px;
+            border-left: 4px solid #4caf50;
+            padding-left: 15px;
+        }
+        .glass-card p {
+            color: #c8e6c9;
+        }
+        .upload-area {
+            border: 2px dashed #4caf50;
+            padding: 20px;
+            text-align: center;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+        input, select {
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            outline: none;
+        }
+        input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        input:focus {
+            background: rgba(255,255,255,0.25);
+            box-shadow: 0 0 5px #4caf50;
+        }
+        button {
+            padding: 10px 20px;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #1b5e20;
+            transform: translateY(-2px);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            color: #e8f5e9;
+        }
+        th {
+            background: rgba(46,125,50,0.5);
+            color: white;
+            font-weight: bold;
+        }
+        .success { color: #81c784; margin-top: 10px; }
+        .error { color: #ef9a9a; margin-top: 10px; }
+        .file-input-label {
+            background: rgba(255,255,255,0.15);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>🔐 Secure Document Vault</h2>
+        <div class="header-buttons">
+            <span id="roleBadge" class="badge"></span>
+            <a href="/admin.html" id="adminLink" class="admin-link" style="display:none;">👑 Admin Panel</a>
+            <button class="logout" onclick="logout()">🚪 Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="glass-card">
+            <h3>Welcome, <span id="username">User</span>!</h3>
+            <p id="roleDescription"></p>
+        </div>
+
+        <div class="glass-card" id="uploadCard">
+            <h3>📤 Upload Document</h3>
+            <div class="upload-area">
+                <input type="file" id="fileInput" accept=".pdf,.txt,.jpg,.png,.doc,.docx" style="width: 100%;">
+                <button onclick="uploadDocument()" style="margin-top: 15px;">🔒 Upload & Encrypt</button>
+            </div>
+            <div id="uploadMessage"></div>
+        </div>
+
+        <div class="glass-card">
+            <h3 id="documentsTitle">📋 My Documents</h3>
+            <div style="overflow-x: auto;">
+                <table id="documentsTable">
+                    <thead>
+                        <tr><th>ID</th><th>Filename</th><th>Size</th><th>Owner</th><th>Uploaded</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="documentsBody">
+                        <tr><td colspan="6">Loading...</td><tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        const role = user.role || 'user';
+        document.getElementById('username').textContent = user.username || 'User';
+        
+        // Set role badge and description
+        const badge = document.getElementById('roleBadge');
+        const roleDesc = document.getElementById('roleDescription');
+        
+        if (role === 'admin') {
+            badge.textContent = '👑 ADMIN';
+            badge.className = 'badge badge-admin';
+            roleDesc.textContent = 'You have full system access to manage users and documents.';
+            document.getElementById('adminLink').style.display = 'inline-block';
+            document.getElementById('documentsTitle').textContent = '📋 All Documents (Admin View)';
+        } else if (role === 'manager') {
+            badge.textContent = '⭐ MANAGER';
+            badge.className = 'badge badge-manager';
+            roleDesc.textContent = 'You can review and verify all documents in the system.';
+            document.getElementById('documentsTitle').textContent = '📋 All Documents (Review Mode)';
+        } else {
+            badge.textContent = '👤 USER';
+            badge.className = 'badge badge-user';
+            roleDesc.textContent = 'You can upload and manage your own encrypted documents.';
+            document.getElementById('documentsTitle').textContent = '📋 My Documents';
+        }
+
+        async function uploadDocument() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('Please select a file', 'error', 'uploadMessage');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`✅ Uploaded! Document ID: ${data.documentId}`, 'success', 'uploadMessage');
+                    fileInput.value = '';
+                    loadDocuments();
+                } else {
+                    showMessage(data.error, 'error', 'uploadMessage');
+                }
+            } catch (error) {
+                showMessage('Upload failed', 'error', 'uploadMessage');
+            }
+        }
+
+        async function loadDocuments() {
+            let url = '/api/documents/list';
+            if (role === 'admin' || role === 'manager') {
+                url = '/api/admin/documents';
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const documents = await response.json();
+                
+                const tbody = document.getElementById('documentsBody');
+                if (!documents.length) {
+                    tbody.innerHTML = '<tr><td colspan="6">No documents found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = documents.map(doc => `
+                    <tr>
+                        <td>${doc.id}</td>
+                        <td>${doc.original_name}</td>
+                        <td>${(doc.file_size / 1024).toFixed(2)} KB</td>
+                        <td>${doc.username || 'You'}</td>
+                        <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                        <td>
+                            <button onclick="verifyDocument(${doc.id})">✅ Verify</button>
+                            ${role === 'user' ? `<button onclick="deleteDocument(${doc.id})">🗑️ Delete</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function verifyDocument(id) {
+            try {
+                const response = await fetch(`/api/documents/verify/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                
+                if (result.integrityValid && result.signatureValid) {
+                    alert(`✅ Document "${result.originalName}" is authentic and untampered!`);
+                } else {
+                    alert(`⚠️ WARNING: Document "${result.originalName}" may have been tampered!`);
+                }
+            } catch (error) {
+                alert('Verification failed');
+            }
+        }
+
+        async function deleteDocument(id) {
+            if (!confirm('Delete this document?')) return;
+            
+            try {
+                const response = await fetch(`/api/documents/delete/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    loadDocuments();
+                } else {
+                    alert('Delete failed');
+                }
+            } catch (error) {
+                alert('Error');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        function showMessage(msg, type, elementId) {
+            const div = document.getElementById(elementId);
+            div.textContent = msg;
+            div.className = type;
+            setTimeout(() => {
+                div.textContent = '';
+                div.className = '';
+            }, 3000);
+        }
+
+        loadDocuments();
+    </script>
+</body>
+</html>

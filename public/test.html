@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <button onclick="login()">Login</button>
+    <div id="result"></div>
+
+    <script>
+        function login() {
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'testuser', password: 'Test1234' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+                console.log('Data:', data);
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = 'Error: ' + error;
+            });
+        }
+    </script>
+</body>
+</html>

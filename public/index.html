@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Document Vault</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background-image: url('/pics/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .main-container {
+            display: flex;
+            max-width: 1200px;
+            width: 90%;
+            margin: 50px auto;
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+        }
+        .image-side {
+            flex: 1;
+            background-image: url('/pics/the side pic.jpg');
+            background-size: cover;
+            background-position: center;
+            min-height: 500px;
+        }
+        .glass-side {
+            flex: 1;
+            background: rgba(0, 30, 0, 0.3);
+            backdrop-filter: blur(15px);
+            padding: 40px;
+            border-left: 1px solid rgba(255,255,255,0.2);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #e8f5e9;
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            color: #c8e6c9;
+        }
+        .tab.active {
+            color: #4caf50;
+            border-bottom: 2px solid #4caf50;
+        }
+        .form {
+            display: none;
+        }
+        .form.active {
+            display: block;
+        }
+        input {
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            outline: none;
+            transition: all 0.3s;
+        }
+        input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        input:focus {
+            background: rgba(255,255,255,0.25);
+            box-shadow: 0 0 5px #4caf50;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #1b5e20;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            font-weight: bold;
+        }
+        .message.success {
+            background: rgba(46,125,50,0.8);
+            color: #e8f5e9;
+            display: block;
+        }
+        .message.error {
+            background: rgba(198,40,40,0.8);
+            color: #ffebee;
+            display: block;
+        }
+        .twofa-field {
+            display: none;
+        }
+        .twofa-field.show {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+                width: 95%;
+            }
+            .image-side {
+                min-height: 200px;
+            }
+            .glass-side {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="image-side"></div>
+        <div class="glass-side">
+            <h2>🔐 Secure Document Vault</h2>
+            <div class="tabs">
+                <button class="tab active" id="loginTab">Login</button>
+                <button class="tab" id="registerTab">Register</button>
+            </div>
+
+        <div id="loginForm" class="form active">
+            <input type="text" id="loginUsername" placeholder="Username">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <div id="twofaField" class="twofa-field">
+                <input type="text" id="twofaToken" placeholder="2FA Code (if enabled)">
+            </div>
+            <a href="/api/auth/google" style="display: block; text-align: center; margin: 15px 0; text-decoration: none;">
+                <button type="button" style="background: #db4437; width: 100%;">🔐 Login with Google</button>
+            </a>
+            <div style="text-align: center; color: rgba(255,255,255,0.5); margin: 10px 0;">OR</div>
+            <button id="loginBtn">Login</button>
+        </div>
+
+            <div id="registerForm" class="form">
+                <input type="text" id="regUsername" placeholder="Username">
+                <input type="email" id="regEmail" placeholder="Email">
+                <input type="password" id="regPassword" placeholder="Password (min 8 chars, 1 uppercase, 1 number)">
+                <button id="registerBtn">Register</button>
+            </div>
+
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginTab').addEventListener('click', () => showTab('login'));
+        document.getElementById('registerTab').addEventListener('click', () => showTab('register'));
+        document.getElementById('loginBtn').addEventListener('click', login);
+        document.getElementById('registerBtn').addEventListener('click', register);
+
+        function showTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            
+            if (tab === 'login') {
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+                loginTab.classList.add('active');
+                registerTab.classList.remove('active');
+            } else {
+                loginForm.classList.remove('active');
+                registerForm.classList.add('active');
+                loginTab.classList.remove('active');
+                registerTab.classList.add('active');
+            }
+            document.getElementById('message').className = 'message';
+        }
+
+        let pendingUserId = null;
+        let pendingSecret = null;
+        
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+        
+            if (!username || !email || !password) {
+                showMessage('All fields required', 'error');
+                return;
+            }
+        
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await response.json();
+                
+                if (response.ok && data.qrCode) {
+                    pendingUserId = data.userId;
+                    pendingSecret = data.twoFactorSecret;
+                    
+                    const qrHtml = `
+                        <div id="qrContainer" style="text-align: center; margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 15px;">
+                            <h4 style="color: #4caf50; margin-bottom: 10px;">🔐 Two-Factor Authentication Required</h4>
+                            <p style="color: white; font-size: 12px;">Scan this QR code with Google Authenticator</p>
+                            <img src="${data.qrCode}" style="width: 180px; border-radius: 10px; margin: 10px 0;">
+                            <input type="text" id="verify2FA" placeholder="Enter 6-digit code" style="width: 80%; text-align: center;">
+                            <button id="verify2FABtn" style="background: #4caf50; margin-top: 10px;">✅ Verify & Complete</button>
+                        </div>
+                    `;
+                    document.getElementById('registerForm').insertAdjacentHTML('beforeend', qrHtml);
+                    document.getElementById('verify2FABtn').onclick = verify2FAAndComplete;
+                    showMessage('Scan QR code with Google Authenticator, then enter the 6-digit code', 'success');
+                } else {
+                    showMessage(data.error || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Server error', 'error');
+            }
+        }
+        
+        async function verify2FAAndComplete() {
+            const token = document.getElementById('verify2FA').value;
+            
+            if (!token) {
+                showMessage('Please enter the 6-digit code', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/verify-2fa-setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        userId: pendingUserId, 
+                        secret: pendingSecret,
+                        token: token 
+                    })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('✅ Registration complete! Please login with your 2FA app.', 'success');
+                    document.getElementById('qrContainer')?.remove();
+                    pendingUserId = null;
+                    pendingSecret = null;
+                    document.getElementById('regUsername').value = '';
+                    document.getElementById('regEmail').value = '';
+                    document.getElementById('regPassword').value = '';
+                    showTab('login');
+                } else {
+                    showMessage('Invalid 2FA code. Try again.', 'error');
+                }
+            } catch (error) {
+                showMessage('Verification failed', 'error');
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const twofaToken = document.getElementById('twofaToken').value;
+        
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, twoFactorToken: twofaToken })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    if (data.user.role === 'admin') {
+                        window.location.href = '/admin.html';
+                    } else {
+                        window.location.href = '/dashboard.html';
+                    }
+                } else if (data.requires2FA) {
+                    document.getElementById('twofaField').classList.add('show');
+                    showMessage('2FA required. Enter your authentication code.', 'success');
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Server error', 'error');
+            }
+        }
+
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = msg;
+            msgDiv.className = `message ${type}`;
+            setTimeout(() => {
+                msgDiv.className = 'message';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

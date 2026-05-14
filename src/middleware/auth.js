@@ -26,12 +26,20 @@ function isAdmin(req, res, next) {
     next();
 }
 
-// Check role: Manager or above
+// Check role: Manager or Admin
 function isManager(req, res, next) {
     if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-        return res.status(403).json({ error: 'Manager access required.' });
+        return res.status(403).json({ error: 'Manager or Admin access required.' });
     }
     next();
 }
 
-module.exports = { authenticateToken, isAdmin, isManager };
+// Check role: User or above
+function isUser(req, res, next) {
+    if (req.user.role !== 'user' && req.user.role !== 'manager' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'User access required.' });
+    }
+    next();
+}
+
+module.exports = { authenticateToken, isAdmin, isManager, isUser };

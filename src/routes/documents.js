@@ -174,4 +174,41 @@ router.get('/verify/:id', authenticateToken, (req, res) => {
     });
 });
 
+// List user's documents
+router.get('/list', authenticateToken, (req, res) => {
+    const query = 'SELECT id, original_name, file_size, uploaded_at FROM documents WHERE user_id = ? ORDER BY uploaded_at DESC';
+    
+    req.db.query(query, [req.user.id], (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json(results);
+    });
+});
+
+// Delete document
+router.delete('/delete/:id', authenticateToken, (req, res) => {
+    const documentId = req.params.id;
+    
+    // First get the file path
+    req.db.query('SELECT file_path FROM documents WHERE id = ? AND user_id = ?', [documentId, req.user.id], (err, docs) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (docs.length === 0) return res.status(404).json({ error: 'Document not found' });
+        
+        const filePath = docs[0].file_path;
+        
+        // Delete from database
+        req.db.query('DELETE FROM documents WHERE id = ? AND user_id = ?', [documentId, req.user.id], (err) => {
+            if (err) return res.status(500).json({ error: 'Database error' });
+            
+            // Delete file from disk
+            const fs = require('fs');
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+            
+            res.json({ message: 'Document deleted successfully' });
+        });
+    });
+});
+
+
 module.exports = router;
