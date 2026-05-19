@@ -33,7 +33,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ 
     storage: storage, 
     fileFilter: fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: { fileSize: 5 * 1024 * 1024 }   
 });
 
 // Generate SHA-256 hash of file
@@ -129,6 +129,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 });
 
 // Verify document integrity
+// Verify document integrity
 router.get('/verify/:id', authenticateToken, (req, res) => {
     const documentId = req.params.id;
     
@@ -144,32 +145,48 @@ router.get('/verify/:id', authenticateToken, (req, res) => {
             
             const signature = sigs[0];
             
-            // Read encrypted file and decrypt to verify
-            const encryptedPath = doc.file_path;
-            const encryptionKey = process.env.ENCRYPTION_KEY;
-            const key = Buffer.from(encryptionKey, 'utf8');
-            const iv = Buffer.from(doc.iv, 'hex');
-            const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-            
-            const encryptedContent = fs.readFileSync(encryptedPath);
-            const decrypted = Buffer.concat([decipher.update(encryptedContent), decipher.final()]);
-            
-            // Calculate hash of decrypted content
-            const currentHash = crypto.createHash('sha256').update(decrypted).digest('hex');
-            
-            // Verify signature
-            const signatureSecret = process.env.JWT_SECRET;
-            const expectedSignature = crypto.createHmac('sha256', signatureSecret).update(signature.hash_value).digest('hex');
-            const isSignatureValid = (expectedSignature === signature.signature);
-            const isIntegrityValid = (currentHash === signature.hash_value);
-            
-            res.json({
-                documentId: documentId,
-                originalName: doc.original_name,
-                integrityValid: isIntegrityValid,
-                signatureValid: isSignatureValid,
-                message: isIntegrityValid && isSignatureValid ? 'Document is authentic and untampered' : 'Document may have been tampered!'
-            });
+            try {
+                // Read encrypted file and decrypt to verify
+                const encryptedPath = doc.file_path;
+                const encryptionKey = process.env.ENCRYPTION_KEY;
+                const key = Buffer.from(encryptionKey, 'utf8');
+                const iv = Buffer.from(doc.iv, 'hex');
+                const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+                
+                const encryptedContent = fs.readFileSync(encryptedPath);
+                // If the file was tampered with, the next line will throw an error!
+                const decrypted = Buffer.concat([decipher.update(encryptedContent), decipher.final()]);
+                
+                // Calculate hash of decrypted content
+                const currentHash = crypto.createHash('sha256').update(decrypted).digest('hex');
+                
+                // Verify signature
+                const signatureSecret = process.env.JWT_SECRET;
+                const expectedSignature = crypto.createHmac('sha256', signatureSecret).update(signature.hash_value).digest('hex');
+                const isSignatureValid = (expectedSignature === signature.signature);
+                const isIntegrityValid = (currentHash === signature.hash_value);
+                
+                res.json({
+                    documentId: documentId,
+                    originalName: doc.original_name,
+                    integrityValid: isIntegrityValid,
+                    signatureValid: isSignatureValid,
+                    message: isIntegrityValid && isSignatureValid ? 'Document is authentic and untampered' : 'Document may have been tampered!'
+                });
+
+            } catch (error) {
+                // WE CATCH THE TAMPERING ERROR HERE!
+                console.error("🔒 Security Alert: Tampering detected during decryption!", error.message);
+                
+                // Instead of crashing, we gracefully tell the frontend the file is compromised
+                res.json({
+                    documentId: documentId,
+                    originalName: doc.original_name,
+                    integrityValid: false, // Failed integrity
+                    signatureValid: false, // Failed signature
+                    message: '⚠️ WARNING: Document has been tampered with or corrupted!'
+                });
+            }
         });
     });
 });
@@ -207,6 +224,63 @@ router.delete('/delete/:id', authenticateToken, (req, res) => {
             
             res.json({ message: 'Document deleted successfully' });
         });
+    });
+});
+
+// Securely Download and Decrypt Document
+router.get('/download/:id', authenticateToken, (req, res) => {
+    const documentId = req.params.id;
+    
+    // Ensure the user owns this document
+    req.db.query('SELECT * FROM documents WHERE id = ? AND user_id = ?', [documentId, req.user.id], (err, docs) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (docs.length === 0) return res.status(404).json({ error: 'Document not found' });
+        
+        const doc = docs[0];
+        
+        try {
+            // Decrypt the file securely in memory
+            const encryptedPath = doc.file_path;
+            const encryptionKey = process.env.ENCRYPTION_KEY;
+            const key = Buffer.from(encryptionKey, 'utf8');
+            const iv = Buffer.from(doc.iv, 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+            
+            const encryptedContent = fs.readFileSync(encryptedPath);
+            const decrypted = Buffer.concat([decipher.update(encryptedContent), decipher.final()]);
+            
+            // Set headers to trigger a file download in the browser
+            res.setHeader('Content-Disposition', `attachment; filename="${doc.original_name}"`);
+            res.setHeader('Content-Type', doc.file_type || 'application/octet-stream');
+            res.setHeader('Content-Length', decrypted.length);
+            
+            // Send the decrypted file back to the user
+            res.send(decrypted);
+        } catch (error) {
+            console.error("Download error:", error);
+            res.status(500).json({ error: 'Failed to decrypt and download file' });
+        }
+    });
+});
+
+// View Detailed Document Metadata
+router.get('/metadata/:id', authenticateToken, (req, res) => {
+    const documentId = req.params.id;
+    
+    // Join documents and signatures tables to get full details
+    const query = `
+        SELECT d.id, d.original_name, d.file_size, d.file_type, d.uploaded_at, 
+               s.hash_value, s.signature 
+        FROM documents d 
+        LEFT JOIN signatures s ON d.id = s.document_id 
+        WHERE d.id = ? AND d.user_id = ?
+    `;
+    
+    req.db.query(query, [documentId, req.user.id], (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (results.length === 0) return res.status(404).json({ error: 'Document not found' });
+        
+        res.json(results[0]);
     });
 });
 

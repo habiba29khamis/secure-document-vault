@@ -314,10 +314,15 @@
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     
+                    // STRICT ROUTING BASED ON ROLE
                     if (data.user.role === 'admin') {
                         window.location.href = '/admin.html';
-                    } else {
+                    } else if (data.user.role === 'manager') {
+                        window.location.href = '/manager.html';
+                    } else if (data.user.role === 'user') {
                         window.location.href = '/dashboard.html';
+                    } else {
+                        showMessage('Invalid role assigned.', 'error');
                     }
                 } else if (data.requires2FA) {
                     document.getElementById('twofaField').classList.add('show');

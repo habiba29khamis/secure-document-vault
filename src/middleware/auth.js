@@ -18,26 +18,26 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// Check role: Admin only
+// STRICT: Admin only
 function isAdmin(req, res, next) {
     if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required.' });
+        return res.status(403).json({ error: 'Strict Admin access required.' });
     }
     next();
 }
 
-// Check role: Manager or Admin
+// STRICT: Manager only
 function isManager(req, res, next) {
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-        return res.status(403).json({ error: 'Manager or Admin access required.' });
+    if (req.user.role !== 'manager') {
+        return res.status(403).json({ error: 'Strict Manager access required.' });
     }
     next();
 }
 
-// Check role: User or above
+// STRICT: User only
 function isUser(req, res, next) {
-    if (req.user.role !== 'user' && req.user.role !== 'manager' && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'User access required.' });
+    if (req.user.role !== 'user') {
+        return res.status(403).json({ error: 'Strict User access required.' });
     }
     next();
 }

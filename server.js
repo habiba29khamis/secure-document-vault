@@ -8,11 +8,14 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const passport = require('passport');
+const managerRoutes = require('./src/routes/manager');
+
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
 
 // Middleware
 app.use(helmet({
@@ -85,6 +88,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', oauthRoutes);
+app.use('/api/manager', managerRoutes);
 
 app.get('/api/protected', authenticateToken, (req, res) => {
     res.json({ message: `Hello ${req.user.username}, you have access!`, user: req.user });

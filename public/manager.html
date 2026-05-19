@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Panel - Secure Document Vault</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background-image: url('/pics/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: rgba(0, 30, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        header h2 { color: #e8f5e9; }
+        .header-buttons { display: flex; gap: 15px; align-items: center; }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            background: #ffa500;
+            color: #1a1a2e;
+        }
+        .logout {
+            background: rgba(46,125,50,0.8);
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            border: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .logout:hover { background: #1b5e20; transform: translateY(-2px); }
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .glass-card {
+            background: rgba(0, 30, 0, 0.35);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        .glass-card h3 {
+            color: #e8f5e9;
+            margin-bottom: 15px;
+            border-left: 4px solid #ffa500;
+            padding-left: 15px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            color: #e8f5e9;
+        }
+        th { background: rgba(255,165,0,0.3); color: white; font-weight: bold; }
+        button.verify-btn {
+            padding: 8px 15px;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button.verify-btn:hover { background: #1b5e20; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>⭐ Manager Review Panel</h2>
+        <div class="header-buttons">
+            <span class="badge">MANAGER</span>
+            <button class="logout" onclick="logout()">🚪 Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="glass-card">
+            <h3>System Documents Queue</h3>
+            <p>Review and verify the integrity of all documents securely uploaded to the vault.</p>
+        </div>
+
+        <div class="glass-card">
+            <div style="overflow-x: auto;">
+                <table id="managerTable">
+                    <thead>
+                        <tr><th>ID</th><th>Filename</th><th>Owner</th><th>Size</th><th>Uploaded</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="managerBody">
+                        <tr><td colspan="6">Loading documents...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        // Check authentication and authorization
+        if (!token || !user.role) {
+            window.location.href = '/';
+        } 
+        // 2. Smart Redirects for wrong roles
+        else if (user.role === 'admin') {
+            window.location.href = '/admin.html';
+        } 
+        else if (user.role === 'user') {
+            window.location.href = '/dashboard.html';
+        }
+
+        async function loadDocuments() {
+        const tbody = document.getElementById('managerBody');
+        
+        try {
+            const response = await fetch('/api/manager/documents', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // 1. Check if the server returned an error (like 404 or 500)
+            if (!response.ok) {
+                const errorText = await response.text();
+                tbody.innerHTML = `<tr><td colspan="6" style="color:#ef9a9a;">Server Error (${response.status}): Endpoint not found or DB error. Did you update server.js?</td></tr>`;
+                console.error("Backend Error:", errorText);
+                return;
+            }
+
+            const documents = await response.json();
+            
+            // 2. Check if the response is actually an array
+            if (!Array.isArray(documents)) {
+                tbody.innerHTML = `<tr><td colspan="6" style="color:#ef9a9a;">Format Error: Expected an array of documents, got something else.</td></tr>`;
+                return;
+            }
+
+            // 3. Check if there are no documents
+            if (documents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No documents found in the system.</td></tr>';
+                return;
+            }
+            
+            // 4. Render the documents
+            tbody.innerHTML = documents.map(doc => `
+                <tr>
+                    <td>${doc.id}</td>
+                    <td>${doc.original_name}</td>
+                    <td>${doc.username || 'Unknown User'}</td>
+                    <td>${(doc.file_size / 1024).toFixed(2)} KB</td>
+                    <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="verify-btn" onclick="verifyDocument(${doc.id})">✅ Verify</button>
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (error) {
+            // 5. Catch network or JSON parsing errors
+            tbody.innerHTML = `<tr><td colspan="6" style="color:#ef9a9a;">Network or System Error: Could not connect to API.</td></tr>`;
+            console.error("Fetch failed:", error);
+        }
+    }
+
+        async function verifyDocument(id) {
+            try {
+                // Use the new manager verify route
+                const response = await fetch(`/api/manager/verify/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+                
+                if (response.ok && result.integrityValid && result.signatureValid) {
+                    alert(`✅ Document "${result.originalName}" is AUTHENTIC.\n\nThe cryptographic hash and digital signature match the original upload. No tampering detected.`);
+                } else {
+                    alert(`⚠️ WARNING: Document "${result.originalName}" FAILED verification.\n\nThe file may have been altered or corrupted!`);
+                }
+            } catch (error) {
+                alert('Verification process encountered an error.');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        loadDocuments();
+    </script>
+</body>
+</html>

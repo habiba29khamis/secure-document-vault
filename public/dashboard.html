@@ -194,34 +194,20 @@
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-        if (!token) {
+        if (!token || !user.role) {
             window.location.href = '/';
         }
-
-        const role = user.role || 'user';
-        document.getElementById('username').textContent = user.username || 'User';
-        
-        // Set role badge and description
-        const badge = document.getElementById('roleBadge');
-        const roleDesc = document.getElementById('roleDescription');
-        
-        if (role === 'admin') {
-            badge.textContent = '👑 ADMIN';
-            badge.className = 'badge badge-admin';
-            roleDesc.textContent = 'You have full system access to manage users and documents.';
-            document.getElementById('adminLink').style.display = 'inline-block';
-            document.getElementById('documentsTitle').textContent = '📋 All Documents (Admin View)';
-        } else if (role === 'manager') {
-            badge.textContent = '⭐ MANAGER';
-            badge.className = 'badge badge-manager';
-            roleDesc.textContent = 'You can review and verify all documents in the system.';
-            document.getElementById('documentsTitle').textContent = '📋 All Documents (Review Mode)';
-        } else {
-            badge.textContent = '👤 USER';
-            badge.className = 'badge badge-user';
-            roleDesc.textContent = 'You can upload and manage your own encrypted documents.';
-            document.getElementById('documentsTitle').textContent = '📋 My Documents';
+        else if (user.role === 'admin') {
+            window.location.href = '/admin.html';
+        } 
+        else if (user.role === 'manager') {
+            window.location.href = '/manager.html';
         }
+
+        document.getElementById('username').textContent = user.username || 'User';
+        document.getElementById('roleBadge').textContent = '👤 USER';
+        document.getElementById('roleBadge').className = 'badge badge-user';
+        document.getElementById('roleDescription').textContent = 'You can upload and manage your own encrypted documents.';
 
         async function uploadDocument() {
             const fileInput = document.getElementById('fileInput');
@@ -256,40 +242,38 @@
         }
 
         async function loadDocuments() {
-            let url = '/api/documents/list';
-            if (role === 'admin' || role === 'manager') {
-                url = '/api/admin/documents';
+        try {
+            // Strictly fetch user's own documents
+            const response = await fetch('/api/documents/list', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const documents = await response.json();
+            
+            const tbody = document.getElementById('documentsBody');
+            if (!Array.isArray(documents) || !documents.length) {
+                tbody.innerHTML = '<tr><td colspan="6">No documents found</td></tr>';
+                return;
             }
             
-            try {
-                const response = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const documents = await response.json();
-                
-                const tbody = document.getElementById('documentsBody');
-                if (!documents.length) {
-                    tbody.innerHTML = '<tr><td colspan="6">No documents found</td></tr>';
-                    return;
-                }
-                
-                tbody.innerHTML = documents.map(doc => `
-                    <tr>
-                        <td>${doc.id}</td>
-                        <td>${doc.original_name}</td>
-                        <td>${(doc.file_size / 1024).toFixed(2)} KB</td>
-                        <td>${doc.username || 'You'}</td>
-                        <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
-                        <td>
-                            <button onclick="verifyDocument(${doc.id})">✅ Verify</button>
-                            ${role === 'user' ? `<button onclick="deleteDocument(${doc.id})">🗑️ Delete</button>` : ''}
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error(error);
-            }
+            tbody.innerHTML = documents.map(doc => `
+                <tr>
+                    <td>${doc.id}</td>
+                    <td>${doc.original_name}</td>
+                    <td>${(doc.file_size / 1024).toFixed(2)} KB</td>
+                    <td>You</td>
+                    <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                    <td>
+                        <button style="padding: 5px 10px; font-size: 12px; margin: 2px;" onclick="downloadDocument(${doc.id}, '${doc.original_name}')">⬇️ Download</button>
+                        <button style="padding: 5px 10px; font-size: 12px; margin: 2px;" onclick="viewMetadata(${doc.id})">ℹ️ Metadata</button>
+                        <button style="padding: 5px 10px; font-size: 12px; margin: 2px;" onclick="verifyDocument(${doc.id})">✅ Verify</button>
+                        <button style="padding: 5px 10px; font-size: 12px; margin: 2px; background: #e94560;" onclick="deleteDocument(${doc.id})">🗑️ Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error(error);
         }
+    }
 
         async function verifyDocument(id) {
             try {
@@ -325,6 +309,95 @@
                 alert('Error');
             }
         }
+        
+        // Download document securely
+        async function downloadDocument(id, filename) {
+            try {
+                const response = await fetch(`/api/documents/download/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    alert('Failed to download document.');
+                    return;
+                }
+                
+                // Convert the response to a blob and trigger a browser download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename; // Forces original file name
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('An error occurred while downloading.');
+            }
+        }
+
+        // Fetch and display metadata
+        // Fetch and display metadata (Upgraded Version)
+        async function viewMetadata(id) {
+            try {
+                // 1. Auto-inject the Modal HTML into the page if it doesn't exist
+                if (!document.getElementById('metadataModal')) {
+                    const modalHtml = `
+                    <div id="metadataModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; align-items:center; justify-content:center;">
+                        <div style="background:#1a1a2e; padding:30px; border-radius:15px; border:1px solid #4caf50; max-width:600px; width:90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                            <h3 style="color:#e8f5e9; border-bottom:1px solid #4caf50; padding-bottom:10px; margin-bottom:15px;">📄 Document Metadata</h3>
+                            <pre id="metadataContent" style="white-space: pre-wrap; word-wrap: break-word; font-size: 13px; color:#c8e6c9; background:rgba(0,0,0,0.3); padding:15px; border-radius:8px;"></pre>
+                            <button onclick="document.getElementById('metadataModal').style.display='none'" style="margin-top:20px; width:100%; background:#4caf50; padding:10px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Close</button>
+                        </div>
+                    </div>`;
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                }
+
+                // 2. Fetch the metadata from the backend
+                const response = await fetch(`/api/documents/metadata/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    alert('⚠️ Server Error: Could not find the metadata route. Did you remember to save documents.js and restart your Node server?');
+                    return;
+                }
+                
+                const meta = await response.json();
+                
+                // 3. Format the data to display in the popup
+                const metaText = `
+📌 Basic Information:
+Filename:    ${meta.original_name}
+File Size:   ${(meta.file_size / 1024).toFixed(2)} KB
+File Type:   ${meta.file_type || 'Unknown'}
+Uploaded On: ${new Date(meta.uploaded_at).toLocaleString()}
+
+🔐 Security Information:
+Cryptographic Hash (SHA-256):
+${meta.hash_value || 'Signature record not found'}
+
+Digital Signature (HMAC):
+${meta.signature || 'Signature record not found'}
+                `.trim();
+                
+                // 4. Show the popup
+                document.getElementById('metadataContent').textContent = metaText;
+                document.getElementById('metadataModal').style.display = 'flex';
+                
+            } catch (error) {
+                console.error('Metadata error:', error);
+                alert('⚠️ Network Error: Check your browser console (Press F12) for details.');
+            }
+        }
+
+        // Close the modal
+        function closeModal() {
+            document.getElementById('metadataModal').style.display = 'none';
+        }
 
         function logout() {
             localStorage.removeItem('token');
@@ -343,6 +416,9 @@
         }
 
         loadDocuments();
+
+        
     </script>
+
 </body>
 </html>

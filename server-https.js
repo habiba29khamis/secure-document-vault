@@ -11,11 +11,12 @@ const passport = require('passport');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-
+const managerRoutes = require('./src/routes/manager');
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
 
 // Middleware (same as before)
 app.use(helmet({
@@ -80,7 +81,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', oauthRoutes);
-
+app.use('/api/manager', managerRoutes);
 app.get('/api/protected', authenticateToken, (req, res) => {
     res.json({ message: `Hello ${req.user.username}`, user: req.user });
 });
